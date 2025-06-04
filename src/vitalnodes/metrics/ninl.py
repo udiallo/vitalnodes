@@ -23,8 +23,8 @@ from __future__ import annotations
 import logging
 import math
 from multiprocessing import Pool, cpu_count
-from typing import Dict, Optional, Tuple
-
+from typing import Dict, Optional, Tuple, List
+from vitalnodes.metrics._utils import _chunked_pool_map
 import networkx as nx
 
 __all__ = ["ninl", "ninl_layer0"]
@@ -42,18 +42,26 @@ def _all_pairs_paths(G: nx.Graph) -> dict[int, dict[int, int]]:
     return dict(nx.all_pairs_shortest_path_length(G))
 
 
-def _chunked_pool_map(func, iterable, parallel: bool, processes: int | None):
-    if not parallel:
-        return map(func, iterable)
-    procs = processes or max(cpu_count() - 1, 1)
-    with Pool(procs) as pool:
-        return pool.map(func, iterable)
+
+
+# ---------------------------------------------------------------------------#
+# Worker functions                                                           #
+# ---------------------------------------------------------------------------#
+
+
+def _ninl_layer0_worker(args: Tuple[int, Dict[int, int], dict[int, dict[int, int]], int]) -> Tuple[int, float]:
+    n, degree, paths, L = args
+    acc = sum(
+        degree[v]
+        for v, dist in paths[n].items()
+        if v != n and dist <= L
+    )
+    return n, degree[n] + acc
 
 
 # ---------------------------------------------------------------------------#
 # Main routine                                                               #
 # ---------------------------------------------------------------------------#
-
 
 # Identifying Influential Nodes in Complex Networks Based on Node Itself and Neighbor Layer Information 
 # https://www.mdpi.com/2073-8994/13/9/1570
@@ -94,16 +102,9 @@ def ninl(
     # layer-0: degree + neighbours within L hops                          #
     # ------------------------------------------------------------------ #
 
-    def _layer0(n: int) -> Tuple[int, float]:
-        acc = sum(
-            degree[v]
-            for v, dist in paths[n].items()
-            if v != n and dist <= L
-        )
-        return n, degree[n] + acc
-
+    payload = [(n, degree, paths, L) for n in G.nodes()]
     scores: Dict[int, float] = dict(
-        _chunked_pool_map(_layer0, G.nodes(), use_mp, processes)
+        _chunked_pool_map(_ninl_layer0_worker, payload, use_mp, processes)
     )
 
     # ------------------------------------------------------------------ #

@@ -22,11 +22,10 @@ from __future__ import annotations
 
 import logging
 import math
-from multiprocessing import Pool, cpu_count
-from statistics import median
 from typing import Dict, Iterable, List, Optional, Tuple
 
 import networkx as nx
+from vitalnodes.metrics._utils import _chunked_pool_map
 
 # ---------------------------------------------------------------------------
 
@@ -45,15 +44,6 @@ _LOG = logging.getLogger(__name__)
 # common helpers ------------------------------------------------------------
 
 
-def _chunked_pool_map(func, iterable, parallel: bool, processes: int | None):
-    """Run *func* over *iterable* either serially or through a Pool()."""
-    if not parallel:
-        return map(func, iterable)
-    procs = processes or max(cpu_count() - 1, 1)
-    with Pool(procs) as pool:
-        return pool.map(func, iterable)
-
-
 def _shannon_entropy(vals: Iterable[float]) -> float:
     """Simple Shannon entropy (base-e)."""
     s = 0.0
@@ -61,6 +51,103 @@ def _shannon_entropy(vals: Iterable[float]) -> float:
         if p > 0:
             s -= p * math.log(p)
     return s
+
+
+# ---------------------------------------------------------------------------
+# Worker functions (module-level for multiprocessing)
+# ---------------------------------------------------------------------------
+
+
+def _mcde_worker(args: Tuple[int, Dict[int, int], Dict[int, int], List[int], int, bool, List[int]]) -> Tuple[int, float]:
+    """
+    Worker for MCDE/MCDWE:
+    args = (node, degree, core_num, sorted_cores, max_core, weighted, nbrs)
+    """
+    node, degree, core_num, sorted_cores, max_core, weighted, nbrs = args
+
+    if not nbrs:  # isolate
+        return node, float(core_num[node] + degree[node] + 0.0)
+
+    # probability that a neighbour resides in core *c*
+    probs: List[float] = []
+    for c in sorted_cores:
+        probs.append(sum(1 for v in nbrs if core_num[v] == c) / len(nbrs))
+
+    entropy = _shannon_entropy(probs)
+
+    if weighted:
+        weights = [(1 / (max_core - c + 1)) for c in sorted_cores]
+        w_entropy = _shannon_entropy(w * p for w, p in zip(weights, probs))
+        entropy = w_entropy
+
+    mcde_val = core_num[node] + degree[node] + entropy
+    return node, mcde_val
+
+
+def _erm_worker(args: Tuple[int, Dict[int, int], Dict[int, int], Dict[int, int], List[int]]) -> Tuple[int, float]:
+    """
+    Worker for ERM:
+    args = (node, degree, d1, d2, nbrs)
+    """
+    node, degree, d1, d2, nbrs = args
+
+    if not nbrs:
+        return node, 0.0
+
+    E1 = -sum((degree[v] / d1[node]) * math.log(degree[v] / d1[node]) for v in nbrs)
+    E2 = -sum((d1[v] / d2[node]) * math.log(d1[v] / d2[node]) for v in nbrs)
+    lam = E2 / max(d2.values()) if max(d2.values()) else 0.0
+    EC = sum(E1 + lam * E2 for v in nbrs)
+    SI = sum(EC for v in nbrs)
+    return node, SI
+
+
+def _dsr_worker(args: Tuple[int, float, int, float]) -> Tuple[int, float]:
+    """
+    Worker for DSR:
+    args = (node, s_ni_val, degree_val, nsd_val)
+    """
+    node, s_ni_val, degree_val, nsd_val = args
+    return node, s_ni_val * degree_val + nsd_val
+
+
+def _dsr_agg_worker(args: Tuple[int, Dict[int, float], List[int]]) -> Tuple[int, float]:
+    """
+    Worker for DSR_AGG (EDSR):
+    args = (node, dsr_scores, nbrs)
+    """
+    node, dsr_scores, nbrs = args
+    return node, sum(dsr_scores[v] for v in nbrs)
+
+
+def _ecrm_worker(args: Tuple[int, Dict[int, int], Dict[int, List[int]], Dict[int, int], List[int], List[int]]) -> Tuple[int, float]:
+    """
+    Worker for ECRM:
+    args = (node, degree, sv, core_iter, sorted_iters, nbrs)
+    """
+    node, degree, sv, core_iter, sorted_iters, nbrs = args
+    max_iter = max(core_iter.values())
+
+    # Compute similarity-based component (SCC_sum)
+    scc_sum = 0.0
+    for v in nbrs:
+        num = sum(
+            (sv[node][i] - degree[node] / max_iter) * (sv[v][i] - degree[v] / max_iter)
+            for i in range(len(sorted_iters))
+        )
+        den = math.sqrt(
+            sum((sv[node][i] - degree[node] / max_iter) ** 2 for i in range(len(sorted_iters)))
+        ) * math.sqrt(
+            sum((sv[v][i] - degree[v] / max_iter) ** 2 for i in range(len(sorted_iters)))
+        )
+        corr = num / den if den else 0.0
+        scc_sum += (2 - corr) + ((2 * degree[v] / max(degree.values())) + 1)
+
+    # First-hop CRM
+    crm = scc_sum
+    # Second-hop ECRM = sum(crm for each neighbor) = crm * len(nbrs)
+    ecrm_val = crm * len(nbrs)
+    return node, ecrm_val
 
 
 # ---------------------------------------------------------------------------
@@ -94,31 +181,19 @@ def mcde(
 
     use_mp = parallel if parallel is not None else len(G) >= 500
 
-    def _score(node: int) -> Tuple[int, float]:
-        nbrs = list(G.neighbors(node))
-        if not nbrs:  # isolate
-            return node, 0.0
+    # Precompute neighbour lists for mcde
+    nbrs_dict: Dict[int, List[int]] = {n: list(G.neighbors(n)) for n in G.nodes()}
 
-        # probability that a neighbour resides in core *c*
-        probs: List[float] = []
-        for c in sorted_cores:
-            probs.append(sum(1 for v in nbrs if core_num[v] == c) / len(nbrs))
+    def _make_payload(node: int) -> Tuple[int, Dict[int, int], Dict[int, int], List[int], int, bool, List[int]]:
+        return node, degree, core_num, sorted_cores, max_core, weighted, nbrs_dict[node]
 
-        entropy = _shannon_entropy(probs)
-
-        if weighted:
-            weights = [(1 / (max_core - c + 1)) for c in sorted_cores]
-            w_entropy = _shannon_entropy(w * p for w, p in zip(weights, probs))
-            entropy = w_entropy
-
-        mcde_val = core_num[node] + degree[node] + entropy
-        return node, mcde_val
-
-    return dict(_chunked_pool_map(_score, G.nodes(), use_mp, processes))
+    payload = [_make_payload(n) for n in G.nodes()]
+    return dict(_chunked_pool_map(_mcde_worker, payload, use_mp, processes))
 
 
 # convenience alias
 mcde_weighted = lambda *a, **kw: mcde(*a, weighted=True, **kw)  # noqa: E731
+
 
 # ---------------------------------------------------------------------------
 # 2. ERM – Zhang & Cui, Chaos 27 (2017)
@@ -142,20 +217,14 @@ def erm(
     d1 = {n: sum(degree[v] for v in G.neighbors(n)) for n in G.nodes()}
     d2 = {n: sum(d1[v] for v in G.neighbors(n)) for n in G.nodes()}
 
-    def _entropy_contrib(node: int) -> Tuple[int, float]:
-        nbrs = list(G.neighbors(node))
-        if not nbrs:
-            return node, 0.0
+    # Precompute neighbour lists for erm
+    nbrs_dict: Dict[int, List[int]] = {n: list(G.neighbors(n)) for n in G.nodes()}
 
-        E1 = -sum((degree[v] / d1[node]) * math.log(degree[v] / d1[node]) for v in nbrs)
-        E2 = -sum((d1[v] / d2[node]) * math.log(d1[v] / d2[node]) for v in nbrs)
+    def _make_payload(node: int) -> Tuple[int, Dict[int, int], Dict[int, int], Dict[int, int], List[int]]:
+        return node, degree, d1, d2, nbrs_dict[node]
 
-        lam = E2 / max(E2 for E2 in d2.values()) if max(d2.values()) else 0.0
-        EC = sum(E1 + lam * E2 for v in nbrs)
-        SI = sum(EC for v in nbrs)
-        return node, SI
-
-    return dict(_chunked_pool_map(_entropy_contrib, G.nodes(), use_mp, processes))
+    payload = [_make_payload(n) for n in G.nodes()]
+    return dict(_chunked_pool_map(_erm_worker, payload, use_mp, processes))
 
 
 # ---------------------------------------------------------------------------
@@ -192,8 +261,11 @@ def dsr(
         n: sum(s_ni[v] * degree[v] for v in G.neighbors(n)) for n in G.nodes()
     }
 
-    dsr_dict = {n: s_ni[n] * degree[n] + nsd[n] for n in G.nodes()}
-    return dsr_dict
+    use_mp = parallel if parallel is not None else len(G) >= 500
+
+    # Prepare payload for multiprocessing
+    payload = [(n, s_ni[n], degree[n], nsd[n]) for n in G.nodes()]
+    return dict(_chunked_pool_map(_dsr_worker, payload, use_mp, processes))
 
 
 def dsr_agg(
@@ -204,11 +276,19 @@ def dsr_agg(
 ) -> Dict[int, float]:
     """Aggregated DSR (== *E*DSR)."""
     dsr_scores = dsr_scores or dsr(G, **kwargs)
-    return {n: sum(dsr_scores[v] for v in G.neighbors(n)) for n in G.nodes()}
+    use_mp = kwargs.get("parallel", None) if "parallel" in kwargs else len(G) >= 500
+    processes = kwargs.get("processes", None)
+
+    # Precompute neighbour lists
+    nbrs_dict: Dict[int, List[int]] = {n: list(G.neighbors(n)) for n in G.nodes()}
+
+    payload = [(n, dsr_scores, nbrs_dict[n]) for n in G.nodes()]
+    return dict(_chunked_pool_map(_dsr_agg_worker, payload, use_mp, processes))
 
 
 # legacy alias
 edsr = dsr_agg  # type: ignore
+
 
 # ---------------------------------------------------------------------------
 # 4. ECRM – Zhou et al., KBS 196 (2020)
@@ -239,39 +319,21 @@ def ecrm(
     sorted_iters = sorted(set(core_iter.values()))
 
     # build “signature” vector for every node
-    sv = {}
+    sv: Dict[int, List[int]] = {}
     for n in G.nodes():
-        vec = []
-        nbrs = list(G.neighbors(n))
+        vec: List[int] = []
+        nbrs_local = list(G.neighbors(n))
         for c in sorted_iters:
-            vec.append(sum(1 for v in nbrs if core_iter[v] == c))
+            vec.append(sum(1 for v in nbrs_local if core_iter[v] == c))
         sv[n] = vec
 
     use_mp = parallel if parallel is not None else len(G) >= 500
 
-    def _score(node: int) -> Tuple[int, float]:
-        nbrs = list(G.neighbors(node))
-        if not nbrs:
-            return node, 0.0
+    # Precompute neighbour lists
+    nbrs_dict: Dict[int, List[int]] = {n: list(G.neighbors(n)) for n in G.nodes()}
 
-        scc = 0.0
-        for v in nbrs:
-            # cosine-like similarity in core-iteration space
-            num = sum(
-                (sv[node][i] - degree[node] / max_iter)
-                * (sv[v][i] - degree[v] / max_iter)
-                for i in range(len(sorted_iters))
-            )
-            den = math.sqrt(
-                sum((sv[node][i] - degree[node] / max_iter) ** 2 for i in range(len(sorted_iters)))
-            ) * math.sqrt(
-                sum((sv[v][i] - degree[v] / max_iter) ** 2 for i in range(len(sorted_iters)))
-            )
-            corr = num / den if den else 0.0
-            scc += (2 - corr) + ((2 * degree[v] / max(degree.values())) + 1)
+    def _make_payload(node: int) -> Tuple[int, Dict[int, int], Dict[int, List[int]], Dict[int, int], List[int], List[int]]:
+        return node, degree, sv, core_iter, sorted_iters, nbrs_dict[node]
 
-        crm = sum(scc for v in nbrs)  # neighbour aggregation
-        ecrm_val = sum(crm for v in nbrs)  # two-hop aggregation
-        return node, ecrm_val
-
-    return dict(_chunked_pool_map(_score, G.nodes(), use_mp, processes))
+    payload = [_make_payload(n) for n in G.nodes()]
+    return dict(_chunked_pool_map(_ecrm_worker, payload, use_mp, processes))

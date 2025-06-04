@@ -22,10 +22,10 @@ from __future__ import annotations
 
 import logging
 import math
-from multiprocessing import Pool, cpu_count
+
 from statistics import median
 from typing import Dict, Iterable, Optional, Tuple
-
+from vitalnodes.metrics._utils import _chunked_pool_map
 import networkx as nx
 
 __all__ = [
@@ -60,13 +60,74 @@ def _neighbors_within_radius(
             yield nbr
 
 
-def _chunked_pool_map(func, iterable, parallel: bool, processes: int | None):
-    """Utility to run `func` over `iterable` either serially or via Pool()."""
-    if not parallel:
-        return map(func, iterable)
-    procs = processes or max(cpu_count() - 1, 1)
-    with Pool(procs) as pool:
-        return pool.map(func, iterable)
+
+# ---------------------------------------------------------------------------
+# Worker functions (module-level for multiprocessing)
+# ---------------------------------------------------------------------------
+
+
+def _gravity_worker(args: Tuple[int, dict[int, dict[int, int]], dict[int, int], int]) -> Tuple[int, float]:
+    n1, paths, core_num, max_distance = args
+    s = 0.0
+    for n2 in _neighbors_within_radius(n1, paths, max_distance):
+        s += (core_num[n1] * core_num[n2]) / (paths[n1][n2] ** 2)
+    return n1, s
+
+
+def _igc_worker(args: Tuple[int, dict[int, dict[int, int]], dict[int, int], dict[int, int], int]) -> Tuple[int, float]:
+    n1, paths, core_num, degree, max_distance = args
+    s = 0.0
+    for n2 in _neighbors_within_radius(n1, paths, max_distance):
+        s += (core_num[n1] * degree[n2]) / (paths[n1][n2] ** 2)
+    return n1, s
+
+
+def _dkigc_worker(args: Tuple[int, dict[int, dict[int, int]], dict[int, int], dict[int, int], int]) -> Tuple[int, float]:
+    n1, paths, DK, _, max_distance = args
+    s = 0.0
+    for n2 in _neighbors_within_radius(n1, paths, max_distance):
+        s += (DK[n1] * DK[n2]) / (paths[n1][n2] ** 2)
+    return n1, s
+
+
+def _lgc_worker(args: Tuple[int, dict[int, dict[int, int]], dict[int, int], int]) -> Tuple[int, float]:
+    n1, paths, degree, radius = args
+    s = 0.0
+    for n2 in _neighbors_within_radius(n1, paths, radius):
+        s += (degree[n1] * degree[n2]) / (paths[n1][n2] ** 2)
+    return n1, s
+
+
+def _mcgm_worker(args: Tuple[int, dict[int, dict[int, int]], dict[int, int], dict[int, int], dict[int, float], int, float, float, float, float, float]) -> Tuple[int, float]:
+    (
+        n1,
+        paths,
+        degree,
+        core_num,
+        eigenvec,
+        radius,
+        dmax,
+        xmax,
+        kmax,
+        alpha,
+        _
+    ) = args
+    s = 0.0
+    for n2 in _neighbors_within_radius(n1, paths, radius):
+        nd1 = degree[n1] / dmax if dmax else 0.0
+        nd2 = degree[n2] / dmax if dmax else 0.0
+
+        ne1 = eigenvec[n1] / xmax if xmax else 0.0
+        ne2 = eigenvec[n2] / xmax if xmax else 0.0
+
+        nk1 = alpha * core_num[n1] / kmax if kmax else 0.0
+        nk2 = alpha * core_num[n2] / kmax if kmax else 0.0
+
+        m1 = nd1 + nk1 + ne1
+        m2 = nd2 + nk2 + ne2
+
+        s += (m1 * m2) / (paths[n1][n2] ** 2)
+    return n1, s
 
 
 # ---------------------------------------------------------------------------
@@ -89,15 +150,10 @@ def gravity_centrality(
 
     paths = paths or _compute_paths(G)
     core_num = core_num or nx.core_number(G)
-    use_mp = parallel if parallel is not None else len(G) >= 500
+    use_mp = parallel
 
-    def _score(n1: int) -> Tuple[int, float]:
-        s = 0.0
-        for n2 in _neighbors_within_radius(n1, paths, max_distance):
-            s += (core_num[n1] * core_num[n2]) / (paths[n1][n2] ** 2)
-        return n1, s
-
-    return dict(_chunked_pool_map(_score, G.nodes(), use_mp, processes))
+    payload = [(n, paths, core_num, max_distance) for n in G.nodes()]
+    return dict(_chunked_pool_map(_gravity_worker, payload, use_mp, processes))
 
 
 def gravity_centrality_agg(
@@ -133,15 +189,10 @@ def improved_gravity_centrality(
     paths = paths or _compute_paths(G)
     core_num = core_num or nx.core_number(G)
     degree = degree or dict(G.degree())
-    use_mp = parallel if parallel is not None else len(G) >= 500
+    use_mp = parallel
 
-    def _score(n1: int) -> Tuple[int, float]:
-        s = 0.0
-        for n2 in _neighbors_within_radius(n1, paths, max_distance):
-            s += (core_num[n1] * degree[n2]) / (paths[n1][n2] ** 2)
-        return n1, s
-
-    return dict(_chunked_pool_map(_score, G.nodes(), use_mp, processes))
+    payload = [(n, paths, core_num, degree, max_distance) for n in G.nodes()]
+    return dict(_chunked_pool_map(_igc_worker, payload, use_mp, processes))
 
 
 def improved_gravity_centrality_agg(
@@ -180,15 +231,10 @@ def dk_gravity_centrality(
     degree = degree or dict(G.degree())
     i_kshell = i_kshell or _i_kshell_helper(G)
     DK = {n: degree[n] + i_kshell[n] for n in G.nodes()}
-    use_mp = parallel if parallel is not None else len(G) >= 500
+    use_mp = parallel
 
-    def _score(n1: int) -> Tuple[int, float]:
-        s = 0.0
-        for n2 in _neighbors_within_radius(n1, paths, max_distance):
-            s += (DK[n1] * DK[n2]) / (paths[n1][n2] ** 2)
-        return n1, s
-
-    return dict(_chunked_pool_map(_score, G.nodes(), use_mp, processes))
+    payload = [(n, paths, DK, degree, max_distance) for n in G.nodes()]
+    return dict(_chunked_pool_map(_dkigc_worker, payload, use_mp, processes))
 
 
 def dk_gravity_centrality_agg(    
@@ -233,15 +279,10 @@ def local_gravity_centrality(
     if avg_shortest_path is None:
         avg_shortest_path = nx.average_shortest_path_length(G)
     radius = round(avg_shortest_path / 2)
-    use_mp = parallel if parallel is not None else len(G) >= 500
+    use_mp = parallel
 
-    def _score(n1: int) -> Tuple[int, float]:
-        s = 0.0
-        for n2 in _neighbors_within_radius(n1, paths, radius):
-            s += (degree[n1] * degree[n2]) / (paths[n1][n2] ** 2)
-        return n1, s
-
-    return dict(_chunked_pool_map(_score, G.nodes(), use_mp, processes))
+    payload = [(n, paths, degree, radius) for n in G.nodes()]
+    return dict(_chunked_pool_map(_lgc_worker, payload, use_mp, processes))
 
 
 # ---------------------------------------------------------------------------
@@ -287,24 +328,23 @@ def mcgm(
     except ZeroDivisionError:
         alpha = 0.0
 
-    use_mp = parallel if parallel is not None else len(G) >= 500
+    use_mp = parallel
 
-    def _score(n1: int) -> Tuple[int, float]:
-        s = 0.0
-        for n2 in _neighbors_within_radius(n1, paths, radius):
-            nd1 = degree[n1] / dmax if dmax else 0.0
-            nd2 = degree[n2] / dmax if dmax else 0.0
-
-            ne1 = eigenvec[n1] / xmax if xmax else 0.0
-            ne2 = eigenvec[n2] / xmax if xmax else 0.0
-
-            nk1 = alpha * core_num[n1] / kmax if kmax else 0.0
-            nk2 = alpha * core_num[n2] / kmax if kmax else 0.0
-
-            m1 = nd1 + nk1 + ne1
-            m2 = nd2 + nk2 + ne2
-
-            s += (m1 * m2) / (paths[n1][n2] ** 2)
-        return n1, s
-
-    return dict(_chunked_pool_map(_score, G.nodes(), use_mp, processes))
+    # Build payload: we pack all required constants once per node
+    payload = [
+        (
+            n,
+            paths,
+            degree,
+            core_num,
+            eigenvec,
+            radius,
+            dmax,
+            xmax,
+            kmax,
+            alpha,
+            0.0,  # placeholder unused
+        )
+        for n in G.nodes()
+    ]
+    return dict(_chunked_pool_map(_mcgm_worker, payload, use_mp, processes))
