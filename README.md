@@ -66,34 +66,6 @@ print(get_metric_names())
 
 ---
 
-## Command-Line Interface (CLI)
-
-```bash
-python -m vitalnodes <graph.edgelist> --metrics gc igc erm --output results.json
-```
-
-```text
-Usage: vitalnodes [-h] -i INPUT [-m METRICS [METRICS ...]] [-p PARALLEL]
-                  [-n PROCESSES] [-o OUTPUT]
-
-Compute Vital-Node metrics on a graph.
-
-Options:
-  -h, --help            Show this help message and exit
-  -i INPUT, --input INPUT
-                        Path to input graph (edge list)
-  -m METRICS [METRICS ...], --metrics METRICS [METRICS ...]
-                        Metric keys to compute (see get_metric_names())
-  -p PARALLEL, --parallel PARALLEL
-                        Enable multiprocessing (True/False)
-  -n PROCESSES, --processes PROCESSES
-                        Number of worker processes if parallel=True
-  -o OUTPUT, --output OUTPUT
-                        Path to write JSON results
-```
-
----
-
 ## API Reference
 
 High‑level façade in `vitalnodes.orchestrator`:
@@ -131,37 +103,7 @@ LS:
   ls
 ```
 
----
 
-## Examples
-
-Browse the `examples/` directory for:
-
-- **quick_start.ipynb** – interactive demo  
-- **compare_metrics.py** – rank-correlation heatmap  
-
----
-
-## Testing
-
-```bash
-pytest tests/
-```
-
----
-
-## Citation
-
-Please cite the core ideas of each family (e.g., Wang *et al.*, Physica A 2016; Liu *et al.*, Sci. Rep. 2022) and our toolkit:
-
-```bibtex
-@software{vitalnodes,
-  author = {Your Name and Contributors},
-  title  = {VitalNodes: Influence‐Oriented Centrality Heuristics},
-  year   = {2025},
-  url    = {https://github.com/udiallo/vitalnodes},
-}
-```
 
 ---
 
