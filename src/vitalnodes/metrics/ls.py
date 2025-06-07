@@ -4,6 +4,8 @@ Link-strength based influence (Li & Shu, Physica A 516 (2019)).
 
 The LS measure uses neighbour similarity (1 – Jaccard distance) to modulate a
 k-core-weighted propagation.
+
+https://www.sciencedirect.com/science/article/pii/S0378437118310707
 """
 from __future__ import annotations
 
@@ -94,8 +96,6 @@ def ls_influence(
     # 3) Build payload and run worker in parallel/serial
     payload: List[
         Tuple[int, Dict[int, int], Dict[int, int], Dict[int, Set[int]], Dict[Tuple[int, int], float]]
-    ] = [
-        (n, degree, core_num, nbr_sets, ls_edge) for n in G.nodes()
-    ]
+    ] = [(n, degree, core_num, nbr_sets, ls_edge) for n in G.nodes()]
 
     return dict(_chunked_pool_map(_ls_worker, payload, use_mp, processes))
