@@ -1,63 +1,170 @@
-# Vital-Node Identification Algorithms: Influence-Oriented Heuristics
+# VitalNodes
 
-This document contrasts **classical centrality measures** with **Vital-Node Identification algorithms**, emphasizing the latter’s role as *fast surrogates* for estimating dynamic spread influence (e.g., final outbreak size in an SIR epidemic).
+[![GitHub Actions](https://img.shields.io/github/actions/workflow/status/yourusername/vitalnodes/ci.yml)](https://github.com/yourusername/vitalnodes/actions)
+[![License](https://img.shields.io/github/license/yourusername/vitalnodes.svg)](LICENSE)
 
----
-
-## 1. Classical Centrality Measures
-
-- **Degree**: Counts immediate connections.
-- **Betweenness**: Counts shortest-path flows.
-- **Closeness**: Inverse average distance to all nodes.
-- **Eigenvector**: Importance of neighbors’ importance.
-
-> *Limitations*:  
-> These metrics capture **static structural importance**, but do **not** directly model how a node drives a spreading process like an epidemic.
+**Vital-Node Identification Algorithms**  
+Fast, influence-oriented heuristics for ranking and immunizing nodes in spreading processes.
 
 ---
 
-## 2. Vital-Node Algorithms
+## Table of Contents
 
-Vital-Node heuristics **augment** static structure by:
-
-1. Assigning each node a “mass” (e.g., degree, k-core number, entropy, eigenvector score).  
-2. Summing pairwise interactions between node masses, **decaying** with graph distance (often inverse-square or similar).  
-3. Producing a **single numeric score** per node that correlates more strongly with:
-   - The **final fraction of nodes infected** in an SIR run seeded at that node.  
-   - The **effectiveness of immunizing/removing** that node in reducing spread.  
-
-### Families of Vital-Node Measures
-
-- **Gravity-Family** (GC, IGC, DK-IGC, LGC, MCGM)  
-- **Entropy-Based** (MCDE, ECRM, ERM, DSR, EDSR)  
-- **NINL** (Node-Influence via Neighbour-Layer)  
-- **Density-Based** (Density Centrality, CLD)  
-- **GLI** (Global-Local Influence)  
-- **LS** (Link-Strength)
+1. [Overview](#overview)  
+2. [Features](#features)  
+3. [Quick Start](#quick-start)  
+4. [Command-Line Interface (CLI)](#command-line-interface-cli)  
+5. [API Reference](#api-reference)  
+6. [Available Metrics](#available-metrics)  
+7. [Examples](#examples)  
+8. [Testing](#testing)  
+9. [Citation](#citation)  
+10. [Contributing](#contributing)  
+11. [License](#license)  
 
 ---
 
-## 3. Influence Approximation
+## Overview
 
-Instead of running **thousands** of Monte Carlo epidemic simulations to rank seeds:
-
-- **Compute** a Vital-Node score **once** (can be parallelized; often \`O(n²)\` or better with pruning).  
-- **Rank** nodes by this score.  
-- **Select** top-\`k\` nodes for immunization or removal.  
-
-Empirical studies (e.g., Wang *et al.*, Physica A 2016; Liu *et al.*, Sci. Rep. 2022) show these heuristics **outperform** raw degree, betweenness, or random-walk measures in predicting true epidemic impact.
+Traditional centrality measures (degree, betweenness, closeness) quantify **static** structural importance.  
+**VitalNodes** provides **influence-oriented surrogates**—single-pass graph heuristics that correlate much better with the actual **final outbreak size** in SIR-type spreading processes, while remaining efficient and parallelizable.
 
 ---
 
-## 4. Key Takeaway
+## Features
 
-> **Vital-Node Identification algorithms** serve as **influence-oriented surrogates**, providing:
-> - **Speed**: No nested epidemic loops.
-> - **Accuracy**: Closer correlation with SIR outcomes.
-> - **Scalability**: Parallelizable, accepts precomputed structures.
-
-They bridge the gap between **graph topology** and **dynamics on the network**, making them ideal for *real-time* intervention planning and *risk assessment* in spreading processes.
+- **Gravity-Family**: GC, IGC, DK-IGC, LGC, MCGM  
+- **Entropy-Based**: MCDE, MCDWE, ERM, DSR/EDSR, ECRM  
+- **Neighbour-Layer**: NINL (configurable layers)  
+- **Density-Based**: Density Centrality, CLD  
+- **Global-Local Influence**: GLI, GLI-new  
+- **Link-Strength**: LS  
+- **Parallel execution** for large graphs  
+- **Uniform façade** via `vitalnodes.orchestrator`  
+- **Simple CLI** for on-the-fly metric computation  
 
 ---
 
-*Based on ACM paper “Privacy-aware Edge Removal…” and classical epidemic-influence literature.*
+## Quick Start
+
+```python
+import networkx as nx
+from vitalnodes.orchestrator import compute_metric, compute_metrics, get_metric_names
+
+# Create a graph
+G = nx.karate_club_graph()
+
+# Compute a single metric
+scores_gc = compute_metric(G, "gc")
+
+# Compute several metrics at once
+batch = compute_metrics(G, ["gc", "erm", "ninl"], parallel=False)
+
+# List all available metric keys
+print(get_metric_names())
+```
+
+---
+
+## Command-Line Interface (CLI)
+
+```bash
+python -m vitalnodes <graph.edgelist> --metrics gc igc erm --output results.json
+```
+
+```text
+Usage: vitalnodes [-h] -i INPUT [-m METRICS [METRICS ...]] [-p PARALLEL]
+                  [-n PROCESSES] [-o OUTPUT]
+
+Compute Vital-Node metrics on a graph.
+
+Options:
+  -h, --help            Show this help message and exit
+  -i INPUT, --input INPUT
+                        Path to input graph (edge list)
+  -m METRICS [METRICS ...], --metrics METRICS [METRICS ...]
+                        Metric keys to compute (see get_metric_names())
+  -p PARALLEL, --parallel PARALLEL
+                        Enable multiprocessing (True/False)
+  -n PROCESSES, --processes PROCESSES
+                        Number of worker processes if parallel=True
+  -o OUTPUT, --output OUTPUT
+                        Path to write JSON results
+```
+
+---
+
+## API Reference
+
+High‑level façade in `vitalnodes.orchestrator`:
+
+- `get_metric_names() -> List[str]`  
+- `compute_metric(G, metric, *, parallel=None, processes=None, **kwargs) -> Dict[node, score]`  
+- `compute_metrics(G, metrics, *, parallel=None, processes=None, **kwargs) -> Dict[metric, Dict[node, score]]`
+
+All metrics accept `parallel` and `processes` flags and metric-specific keyword arguments.
+
+---
+
+## Available Metrics
+
+```
+gravity-family:
+  gc, gc+ (neighbor-aggregated), igc, igc+, dk, dk+, lgc, mcgm
+
+entropy-family:
+  mcde, mcde_weighted, erm, dsr, edsr, ecrm
+
+NINL:
+  ninl, ninl_layer0
+
+density-family:
+  density, cld
+
+GLI:
+  gli, gli_new
+
+h-index:
+  h_index, local_h_index
+
+LS:
+  ls
+```
+
+---
+
+## Examples
+
+Browse the `examples/` directory for:
+
+- **quick_start.ipynb** – interactive demo  
+- **compare_metrics.py** – rank-correlation heatmap  
+
+---
+
+## Testing
+
+```bash
+pytest tests/
+```
+
+---
+
+## Citation
+
+Please cite the core ideas of each family (e.g., Wang *et al.*, Physica A 2016; Liu *et al.*, Sci. Rep. 2022) and our toolkit:
+
+```bibtex
+@software{vitalnodes,
+  author = {Your Name and Contributors},
+  title  = {VitalNodes: Influence‐Oriented Centrality Heuristics},
+  year   = {2025},
+  url    = {https://github.com/udiallo/vitalnodes},
+}
+```
+
+---
+
+## License
+
+Distributed under the [MIT License](LICENSE).
