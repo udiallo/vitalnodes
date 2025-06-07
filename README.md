@@ -1,8 +1,5 @@
 # VitalNodes
 
-[![GitHub Actions](https://img.shields.io/github/actions/workflow/status/yourusername/vitalnodes/ci.yml)](https://github.com/yourusername/vitalnodes/actions)
-[![License](https://img.shields.io/github/license/yourusername/vitalnodes.svg)](LICENSE)
-
 **Vital-Node Identification Algorithms**  
 Fast, influence-oriented heuristics for ranking and immunizing nodes in spreading processes.
 
