@@ -25,6 +25,6 @@ def _chunked_pool_map(
     """
     if not parallel:
         return map(func, iterable)
-    procs = processes or max(10, 1)
+    procs = processes or max(cpu_count() - 1, 1)
     with Pool(procs) as pool:
         return pool.map(func, iterable)
