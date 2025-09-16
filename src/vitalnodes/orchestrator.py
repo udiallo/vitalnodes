@@ -12,7 +12,8 @@ Central façade for Vital-Node metrics.
 # -----------------------------------------------------------------------------
 import inspect
 import logging
-from typing import Any, Dict, Iterable, List, Optional
+from typing import Any, Dict, Iterable, List, Optional, Union
+from multiprocessing import Pool
 
 import networkx as nx
 
@@ -74,20 +75,38 @@ def get_metric_names() -> List[str]:
     """Return all supported metric keys."""
     return list(_METRIC_REGISTRY.keys())
 
+def _compute_metric_helper(fn, graph, kwargs):
+    """Helper function for multiprocessing."""
+    return fn(graph, **kwargs)
 
 def compute_metric(
-    G: nx.Graph,
+    G: Union[nx.Graph, List[nx.Graph]],
     name: str,
     *,
     parallel: Optional[bool] = None,
     processes: Optional[int] = None,
     **kwargs: Any,
-) -> Dict[Any, float]:
+) -> Union[Dict[Any, float], List[Dict[Any, float]]]:
     """Compute a single metric by key."""
     if name not in _METRIC_REGISTRY:
         raise ValueError(f"Unknown metric '{name}'. Available: {get_metric_names()}")
     fn = _METRIC_REGISTRY[name]
-    return fn(G, parallel=parallel, processes=processes, **kwargs)
+
+    if isinstance(G, list):
+        if G[0].number_of_nodes() <= 500:
+            parallel = False
+            print("Ignoring parallel: small graph")
+        if parallel:
+            # Use multiprocessing to compute metrics in parallel
+            with Pool(processes=processes) as pool:
+                results = pool.starmap(
+                    _compute_metric_helper, [(fn, graph, kwargs) for graph in G]
+                )
+            return results
+        else:
+            return [fn(g, parallel=parallel, processes=processes, **kwargs) for g in G]
+    else:
+        return fn(G, parallel=parallel, processes=processes, **kwargs)
 
 
 # ── batch runner ─────────────────────────────────────────────────────────────
