@@ -91,6 +91,7 @@ def gli_new(
     core_num: Optional[dict[int, int]] = None,
     parallel: bool | None = None,
     processes: int | None = None,
+    time_step: Optional[int] = None 
 ) -> Dict[int, float]:
     """GLI-new combines neighbour degree, Jaccard similarity & k-core."""
 
@@ -109,6 +110,12 @@ def gli_new(
         )
 
     deg_max = max(degree.values())
+    if deg_max == 0:
+        if time_step is not None:
+            _LOG.warning("Graph at index %s has a maximum degree of zero" % time_step)
+        else:
+            _LOG.warning("Graph maximum degree is zero")
+        return {n: 0 for n in G.nodes()}
 
     payload: List[Tuple[int, Dict[int, int], Dict[int, int], Dict[int, set[int]], float]] = [
         (n, degree, core_num, omega_vals, deg_max) for n in G.nodes()

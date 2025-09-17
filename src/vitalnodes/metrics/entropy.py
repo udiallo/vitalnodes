@@ -192,7 +192,10 @@ def mcde(
 
 
 # convenience alias
-mcde_weighted = lambda *a, **kw: mcde(*a, weighted=True, **kw)  # noqa: E731
+#mcde_weighted = lambda *a, **kw: mcde(*a, weighted=True, **kw)  # noqa: E731
+def mcde_weighted(*a, **kw):
+    """Convenience wrapper for weighted MCDE."""
+    return mcde(*a, weighted=True, **kw)
 
 
 # ---------------------------------------------------------------------------

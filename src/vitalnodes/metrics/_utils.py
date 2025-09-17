@@ -1,6 +1,7 @@
 # src/vitalnodes/metrics/_utils.py
 
-from multiprocessing import Pool, cpu_count
+from multiprocessing import cpu_count
+from pathos.multiprocessing import Pool
 from typing import Callable, Iterable, Any, Optional
 
 def _chunked_pool_map(
