@@ -156,7 +156,7 @@ def _temporal_gravity_worker(args):
         dist, _ = distance_matrix[node][nbr]
         if dist > 0:  # avoid div by zero
             s += (M[node] * M[nbr]) / (dist ** 2)
-    return node, s
+    return node, float(s)
 
 def temporal_shortest_path(graph_snapshots, max_length=None):
     edges = build_temporal_edges(graph_snapshots)

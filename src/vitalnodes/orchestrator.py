@@ -91,7 +91,7 @@ def compute_metric(
     parallel: Optional[bool] = None,
     processes: Optional[int] = None,
     **kwargs: Any,
-) -> Union[Dict[Any, float], List[Dict[Any, float | None]]]:
+) -> Union[Dict[Any, float | None], List[Dict[Any, float | None]]]:
     """Compute a single metric by key."""
     if name not in _METRIC_REGISTRY:
         raise ValueError(f"Unknown metric '{name}'. Available: {get_metric_names()}")
@@ -123,6 +123,9 @@ def compute_metric(
     else:
         if G.number_of_nodes() >= 500:
             _LOG.info("You maybe want to enable parallel processing for graphs with ≥ 500 nodes unless you set ``parallel=False``.")
+        if not nx.is_connected(G) and "avg_shortest_path" in inspect.signature(fn).parameters:
+            _LOG.warning(f"Graph is not connected; skipping avg_shortest_path and metric based on it (%s)", fn.__name__)
+            return {n: None for n in G.nodes()}
         return fn(G, parallel=parallel, processes=processes, **kwargs)
 
 

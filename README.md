@@ -67,9 +67,22 @@ print(get_metric_names())
 
 High‑level façade in `vitalnodes.orchestrator`:
 
-- `get_metric_names() -> List[str]`  
+- `get_metric_names() -> List[str]` 
+
+If G is a static graph (nx.Graph):
 - `compute_metric(G, metric, *, parallel=None, processes=None, **kwargs) -> Dict[node, score]`  
 - `compute_metrics(G, metrics, *, parallel=None, processes=None, **kwargs) -> Dict[metric, Dict[node, score]]`
+
+If G is a temporal graph (List[nx.Graph]):
+  
+  - If `metric == "tgc"`:
+    - `compute_metric(G, metric, *, parallel=None, processes=None, **kwargs) -> Dict[node, score]` 
+  - otherwise:
+    - `compute_metric(G, metric, *, parallel=None, processes=None, **kwargs) -> List[Dict[node, score]]` 
+
+  - `compute_metrics(G, metrics, *, parallel=None, processes=None, **kwargs) -> Dict[time, Dict[metric, Dict[node, score]]]`
+
+
 
 All metrics accept `parallel` and `processes` flags and metric-specific keyword arguments.
 
