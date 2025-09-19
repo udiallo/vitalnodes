@@ -137,7 +137,7 @@ def compute_metrics(
         parallel: Optional[bool] = None,
         processes: Optional[int] = None,
         **kwargs: Any,
-        ) -> Union[Mapping[str, Mapping[Any, Union[float, None]]], Mapping[int, Mapping[str, Mapping[Any, Union[float, None]]]]]:
+        ) -> Union[Dict[str, Dict[Any, Union[float, None]]], Dict[int, Dict[str, Dict[Any, Union[float, None]]]]]:
     """
     Compute several metrics; shared heavy helpers are done once.
     """

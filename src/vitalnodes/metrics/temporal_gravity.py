@@ -224,7 +224,7 @@ def temporal_gravity_centrality(
         Gravity centrality scores for each node.
     """
     if isinstance(snapshots, nx.Graph):
-        raise ValueError("Expected a list of snapshots, got a single graph.")
+        raise ValueError('Expected a list of snapshots to compute "tgc" metric, got a single graph.')
 
     # Get consistent node ordering (union of all snapshots)
     nodes = get_nodes(snapshots)
