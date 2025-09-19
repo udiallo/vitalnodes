@@ -30,7 +30,7 @@ Traditional centrality measures (degree, betweenness, closeness) quantify **stat
 
 ## Features
 
-- **Gravity-Family**: GC, IGC, DK-IGC, LGC, MCGM  
+- **Gravity-Family**: GC, IGC, DK-IGC, LGC, MCGM, TGC  
 - **Entropy-Based**: MCDE, MCDWE, ERM, DSR/EDSR, ECRM  
 - **Neighbour-Layer**: NINL (configurable layers)  
 - **Density-Based**: Density Centrality, CLD  
@@ -79,7 +79,7 @@ All metrics accept `parallel` and `processes` flags and metric-specific keyword 
 
 ```
 gravity-family:
-  gc, gc+ (neighbor-aggregated), igc, igc+, dk, dk+, lgc, mcgm
+  gc, gc+ (neighbor-aggregated), igc, igc+, dk, dk+, lgc, mcgm, tgc
 
 entropy-family:
   mcde, mcde_weighted, erm, dsr, edsr, ecrm
