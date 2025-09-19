@@ -258,7 +258,7 @@ def temporal_gravity_centrality(
         with mp.Pool(processes=processes) as pool:
             results = pool.map(_temporal_gravity_worker, payload)
     else:
-        results = map(_temporal_gravity_worker, payload)
+        results = list(map(_temporal_gravity_worker, payload))
 
     # Convert results to dict
     return dict(results)

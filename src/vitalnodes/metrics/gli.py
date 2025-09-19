@@ -37,7 +37,7 @@ def _gli_worker(args: Tuple[int, Dict[int, int], Dict[int, int], dict[int, dict[
     return n1, (math.e ** local_mass) * acc  # using math.e
 
 
-def _gli_new_worker(args: Tuple[int, Dict[int, int], Dict[int, int], Dict[int, set[int]], float]) -> Tuple[int, float]:
+def _gli_new_worker(args: Tuple[int, Dict[int, int], Dict[int, int], Dict[int, float], float]) -> Tuple[int, float]:
     n, degree, core_num, omega_vals, deg_max = args
     local = degree[n] + (omega_vals[n] / deg_max)
     return n, local + core_num[n]
@@ -73,7 +73,7 @@ def gli(
 
     denom = sum(i_ks[n] + degree[n] for n in G.nodes())
 
-    payload: List[Tuple[int, Dict[int, int], Dict[int, int], dict[int, dict[int, int]], int, float]] = [
+    payload: List[Tuple[int, Dict[int, int], Dict[int, int], Dict[int, dict[int, int]], int, float]] = [
         (n1, degree, i_ks, paths, max_distance, denom) for n1 in G.nodes()
     ]
     return dict(_chunked_pool_map(_gli_worker, payload, use_mp, processes))
@@ -117,7 +117,7 @@ def gli_new(
             _LOG.warning("Graph maximum degree is zero")
         return {n: 0 for n in G.nodes()}
 
-    payload: List[Tuple[int, Dict[int, int], Dict[int, int], Dict[int, set[int]], float]] = [
+    payload: List[Tuple[int, Dict[int, int], Dict[int, int], Dict[int, float], float]] = [
         (n, degree, core_num, omega_vals, deg_max) for n in G.nodes()
     ]
     return dict(_chunked_pool_map(_gli_new_worker, payload, use_mp, processes))

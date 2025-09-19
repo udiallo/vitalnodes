@@ -12,7 +12,7 @@ Central façade for Vital-Node metrics.
 # -----------------------------------------------------------------------------
 import inspect
 import logging
-from typing import Any, Dict, Iterable, List, Optional, Union
+from typing import Any, Dict, Iterable, List, Optional, Union, Mapping
 from multiprocessing import Pool
 
 import networkx as nx
@@ -134,7 +134,7 @@ def compute_metrics(
         parallel: Optional[bool] = None,
         processes: Optional[int] = None,
         **kwargs: Any,
-        ) -> Union[Dict[str, Dict[Any, float]], Dict[int, Dict[str, Dict[Any, float | None]]]]:
+        ) -> Union[Mapping[str, Mapping[Any, Union[float, None]]], Mapping[int, Mapping[str, Mapping[Any, Union[float, None]]]]]:
     """
     Compute several metrics; shared heavy helpers are done once.
     """
@@ -171,7 +171,7 @@ def compute_metrics(
                 )
             return {i: result for i, result in enumerate(results)}
         else:
-            temporal_results: Dict[int, Dict[str, Dict[Any, float | None]]] = {}
+            temporal_results: Dict[int, Mapping[str, Mapping[Any, float | None]]] = {}
             for time, graph in enumerate(G):
                 temporal_results[time] = _compute_metrics_for_graph(
                     graph, funcs, param_names, need_degree, need_core_iter, need_core_num, need_paths, need_avg_sp, need_i_ks, need_clustering, metrics, kwargs, time
@@ -202,7 +202,7 @@ def _compute_metrics_for_graph(
         metrics: Iterable[str],
         kwargs: Any,
         time: Optional[int] = None
-        ) -> Dict[str, Dict[Any, Optional[float]]]:
+        ) -> Mapping[str, Mapping[Any, Optional[float]]]:
     """Compute metrics for a single graph."""
     degree = dict(graph.degree()) if need_degree else None
     core_num = core_iter = None

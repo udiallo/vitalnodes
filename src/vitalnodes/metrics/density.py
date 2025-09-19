@@ -95,10 +95,10 @@ def clustered_local_degree(
 
     degree = degree or dict(G.degree())
     paths = paths or _all_pairs_paths(G)
-    clustering = clustering or nx.clustering(G)
+    if clustering is None:
+        clustering = nx.clustering(G)
     use_mp = parallel if parallel is not None else len(G) >= 500
-
     payload: List[Tuple[int, Dict[int, int], dict[int, dict[int, int]], Dict[int, float], int]] = [
         (n1, degree, paths, clustering, max_distance) for n1 in G.nodes()
-    ]
+    ] if clustering is not None else []
     return dict(_chunked_pool_map(_cld_worker, payload, use_mp, processes))

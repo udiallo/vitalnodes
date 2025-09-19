@@ -7,7 +7,7 @@ from typing import Callable, Iterable, Any, Optional
 def _chunked_pool_map(
     func: Callable[[Any], Any],
     iterable: Iterable[Any],
-    parallel: bool,
+    parallel: Optional[bool],
     processes: Optional[int]
 ):
     """

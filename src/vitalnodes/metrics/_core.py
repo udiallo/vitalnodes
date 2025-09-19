@@ -26,14 +26,14 @@ __all__ = ["k_shell_alternative", "i_kshell"]
 def _check(G: nx.Graph, k: int) -> int:
     """Return 1 while there is at least one node with degree ≤ *k*."""
     for n in list(G.nodes()):
-        if G.degree(n) <= k:
+        if G.degree[n] <= k:
             return 1
     return 0
 
 
 def _find_nodes(G: nx.Graph, k: int) -> list[int]:
     """Return nodes whose current degree ≤ *k*."""
-    return [n for n in list(G.nodes()) if G.degree(n) <= k]
+    return [n for n in list(G.nodes()) if G.degree[n] <= k]
 
 
 # ---------------------------------------------------------------------------#
