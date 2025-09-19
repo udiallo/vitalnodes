@@ -24,6 +24,7 @@ from vitalnodes.metrics.gravity  import (
     dk_gravity_centrality, dk_gravity_centrality_agg,
     local_gravity_centrality, mcgm,
 )
+from vitalnodes.metrics.temporal_gravity import temporal_gravity_centrality
 from vitalnodes.metrics.entropy  import mcde, mcde_weighted, erm, dsr, dsr_agg, ecrm
 from vitalnodes.metrics.ninl     import ninl, ninl_layer0
 from vitalnodes.metrics.density  import density_centrality, clustered_local_degree
@@ -47,6 +48,7 @@ _METRIC_REGISTRY: Dict[str, Any] = {
     "dk+":  dk_gravity_centrality_agg,
     "lgc":  local_gravity_centrality,
     "mcgm": mcgm,
+    "tgc":  temporal_gravity_centrality,
     # entropy
     "mcde":          mcde,
     "mcde_weighted": mcde_weighted,
@@ -99,16 +101,25 @@ def compute_metric(
         if parallel:
             if G[0].number_of_nodes() <= 500:
                 _LOG.warning("You should maybe not enable parallel processing for graphs with < 500 nodes.")
-            # Use multiprocessing to compute metric in parallel for each graph
-            with Pool(processes=processes) as pool:
-                results = pool.starmap(
-                    _compute_metric_helper, [(fn, graph, time, kwargs) for time, graph in enumerate(G)]
-                )
+            
+            if name != 'tgc':
+                # Use multiprocessing to compute metric in parallel for each graph
+                with Pool(processes=processes) as pool:
+                    results = pool.starmap(
+                        _compute_metric_helper, [(fn, graph, time, kwargs) for time, graph in enumerate(G)]
+                    )
+            else:
+                _LOG.info("Temporal Gravity Centrality (tgc) is much slower than other metrics")
+                results = fn(G, **kwargs)
             return results
         else:
             if G[0].number_of_nodes() >= 500 or len(G) > 100:
                 _LOG.info("You maybe want to enable parallel processing for graphs with ≥ 500 nodes or more than 100 graphs unless you set ``parallel=False``.")
-            return [fn(g, parallel=parallel, processes=processes, **kwargs) for g in G]
+            if name != 'tgc':
+                return [fn(g, parallel=parallel, processes=processes, **kwargs) for g in G]
+            else:
+                _LOG.info("Temporal Gravity Centrality (tgc) is much slower than other metrics")
+                return fn(G, **kwargs)
     else:
         if G.number_of_nodes() >= 500:
             _LOG.info("You maybe want to enable parallel processing for graphs with ≥ 500 nodes unless you set ``parallel=False``.")
@@ -133,9 +144,12 @@ def compute_metrics(
     for key in metrics:
         if key not in _METRIC_REGISTRY:
             raise ValueError(f"Unknown metric '{key}'. Available: {get_metric_names()}")
-        fn = _METRIC_REGISTRY[key]
-        funcs.append((key, fn))
-        param_names.append(list(inspect.signature(fn).parameters.keys()))
+        if key != 'tgc':
+            fn = _METRIC_REGISTRY[key]
+            funcs.append((key, fn))
+            param_names.append(list(inspect.signature(fn).parameters.keys()))
+        else:
+            raise ValueError("Temporal Gravity Centrality (tgc) cannot be computed in batch mode; use compute_metric instead.")
 
     # 2) detect which pre-computes are needed at least once
     need_degree = any("degree" in p for params in param_names for p in params)
