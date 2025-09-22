@@ -8,16 +8,17 @@ Fast, influence-oriented heuristics for ranking and immunizing nodes in spreadin
 ## Table of Contents
 
 1. [Overview](#overview)  
-2. [Features](#features)  
-3. [Quick Start](#quick-start)  
-4. [Command-Line Interface (CLI)](#command-line-interface-cli)  
-5. [API Reference](#api-reference)  
-6. [Available Metrics](#available-metrics)  
-7. [Examples](#examples)  
-8. [Testing](#testing)  
-9. [Citation](#citation)  
-10. [Contributing](#contributing)  
-11. [License](#license)  
+2. [Features](#features) 
+3. [Installation](#installation) 
+4. [Quick Start](#quick-start)  
+5. [Command-Line Interface (CLI)](#command-line-interface-cli)  
+6. [API Reference](#api-reference)  
+7. [Available Metrics](#available-metrics)  
+8. [Examples](#examples)  
+9. [Testing](#testing)  
+10. [Citation](#citation)  
+11. [Contributing](#contributing)  
+12. [License](#license)  
 
 ---
 
@@ -40,6 +41,20 @@ Traditional centrality measures (degree, betweenness, closeness) quantify **stat
 - **Uniform façade** via `vitalnodes.orchestrator`  
 - **Simple CLI** for on-the-fly metric computation  
 
+---
+
+## Installation
+
+```
+git clone https://github.com/your-repo/vitalnodes.git
+cd vitalnodes
+pip install -e .
+```
+The package requires the following dependencies:
+
+- networkx
+- numpy
+- pathos (multiprocessing)
 ---
 
 ## Quick Start
