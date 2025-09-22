@@ -46,7 +46,7 @@ Traditional centrality measures (degree, betweenness, closeness) quantify **stat
 ## Installation
 
 ```
-git clone https://github.com/your-repo/vitalnodes.git
+git clone git@github.com:udiallo/vitalnodes.git
 cd vitalnodes
 pip install -e .
 ```
