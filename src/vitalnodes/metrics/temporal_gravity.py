@@ -18,20 +18,6 @@ __all__ = ["temporal_gravity_centrality"]
 _LOG = logging.getLogger(__name__)
 
 
-def matrix_to_numpy(matrix, nodes):
-    """Convert matrix to numpy array (cost or path length)."""
-    n = len(nodes)
-    idx = {node: i for i, node in enumerate(nodes)}
-    result = np.full((n, n), np.inf)  # Initialize with inf
-
-    for u in nodes:
-        for v in nodes:
-            value = matrix[u][v][0]  # cost or arrival time
-            result[idx[u]][idx[v]] = value
-
-    return result
-
-
 def get_degree_vector(snapshots, temporal_or_static='static'):
     nodes = get_nodes(snapshots)  # Consistent ordering
     N = len(nodes)
@@ -128,12 +114,9 @@ def get_aggregated_static_network(snapshots):
     """Create an aggregated static network from temporal snapshots."""
     aggregated_graph = nx.Graph()
     
-    # Add all nodes from all snapshots
+    # Add all nodes/edges from all snapshots
     for G in snapshots:
         aggregated_graph.add_nodes_from(G.nodes())
-    
-    # Add all edges from all snapshots (duplicates will be ignored)
-    for G in snapshots:
         aggregated_graph.add_edges_from(G.edges())
     
     return aggregated_graph
