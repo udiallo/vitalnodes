@@ -31,6 +31,7 @@ from vitalnodes.metrics.density  import density_centrality, clustered_local_degr
 from vitalnodes.metrics.gli      import gli, gli_new
 from vitalnodes.metrics.hindex   import h_index, local_h_index
 from vitalnodes.metrics.ls       import ls_influence
+from vitalnodes.metrics.classical_metrics import get_degree, get_closeness, get_betweenness, get_eigenvector
 
 # helpers
 from vitalnodes.metrics._core    import k_shell_alternative, i_kshell
@@ -70,6 +71,11 @@ _METRIC_REGISTRY: Dict[str, Any] = {
     "local_h_index": local_h_index,
     # link-strength
     "ls": ls_influence,
+    # classical metrics
+    "degree": get_degree,
+    "closeness": get_closeness,
+    "betweenness": get_betweenness,
+    "eigenvector": get_eigenvector,
 }
 
 # ── public helpers ───────────────────────────────────────────────────────────
@@ -96,6 +102,10 @@ def compute_metric(
     if name not in _METRIC_REGISTRY:
         raise ValueError(f"Unknown metric '{name}'. Available: {get_metric_names()}")
     fn = _METRIC_REGISTRY[name]
+
+    if name in ['degree', 'closeness', 'betweenness', 'eigenvector'] and parallel:
+        _LOG.warning(f"Classical metric '{name}' does not support parallel processing; setting parallel=False.")
+        parallel = False
 
     if isinstance(G, list):
         if parallel:
@@ -137,7 +147,7 @@ def compute_metrics(
         parallel: Optional[bool] = None,
         processes: Optional[int] = None,
         **kwargs: Any,
-        ) -> Union[Dict[str, Dict[Any, Union[float, None]]], Dict[int, Dict[str, Dict[Any, Union[float, None]]]]]:
+        ) -> Union[Dict[str, Dict[Any, Union[float, None]]], List[Dict[str, Dict[Any, Union[float, None]]]]]:
     """
     Compute several metrics; shared heavy helpers are done once.
     """
@@ -172,13 +182,13 @@ def compute_metrics(
                     [(graph, funcs, param_names, need_degree, need_core_iter, need_core_num, need_paths, need_avg_sp, need_i_ks, need_clustering, metrics, kwargs, time)
                      for time, graph in enumerate(G)]
                 )
-            return {i: result for i, result in enumerate(results)}
+            return list(results)
         else:
-            temporal_results: Dict[int, Mapping[str, Mapping[Any, float | None]]] = {}
+            temporal_results: List[Dict[str, Dict[Any, float | None]]] = []
             for time, graph in enumerate(G):
-                temporal_results[time] = _compute_metrics_for_graph(
+                temporal_results.append(_compute_metrics_for_graph(
                     graph, funcs, param_names, need_degree, need_core_iter, need_core_num, need_paths, need_avg_sp, need_i_ks, need_clustering, metrics, kwargs, time
-                )
+                ))
             return temporal_results
     else:
         if G.number_of_nodes() >= 500:
@@ -205,7 +215,7 @@ def _compute_metrics_for_graph(
         metrics: Iterable[str],
         kwargs: Any,
         time: Optional[int] = None
-        ) -> Mapping[str, Mapping[Any, Optional[float]]]:
+        ) -> Dict[str, Dict[Any, Optional[float]]]:
     """Compute metrics for a single graph."""
     degree = dict(graph.degree()) if need_degree else None
     core_num = core_iter = None
