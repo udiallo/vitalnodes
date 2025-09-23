@@ -54,6 +54,7 @@ The package requires the following dependencies:
 
 - networkx
 - numpy
+- scipy
 - pathos (multiprocessing)
 ---
 
@@ -126,6 +127,9 @@ h-index:
 
 LS:
   ls
+
+Classical metrics:
+  degree, closeness, betweenness, eigenvector, pagerank
 ```
 
 

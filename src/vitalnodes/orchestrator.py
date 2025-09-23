@@ -31,7 +31,7 @@ from vitalnodes.metrics.density  import density_centrality, clustered_local_degr
 from vitalnodes.metrics.gli      import gli, gli_new
 from vitalnodes.metrics.hindex   import h_index, local_h_index
 from vitalnodes.metrics.ls       import ls_influence
-from vitalnodes.metrics.classical_metrics import get_degree, get_closeness, get_betweenness, get_eigenvector
+from vitalnodes.metrics.classical_metrics import get_degree, get_closeness, get_betweenness, get_eigenvector, get_pagerank
 
 # helpers
 from vitalnodes.metrics._core    import k_shell_alternative, i_kshell
@@ -76,6 +76,7 @@ _METRIC_REGISTRY: Dict[str, Any] = {
     "closeness": get_closeness,
     "betweenness": get_betweenness,
     "eigenvector": get_eigenvector,
+    "pagerank": get_pagerank,
 }
 
 # ── public helpers ───────────────────────────────────────────────────────────
@@ -103,7 +104,7 @@ def compute_metric(
         raise ValueError(f"Unknown metric '{name}'. Available: {get_metric_names()}")
     fn = _METRIC_REGISTRY[name]
 
-    if name in ['degree', 'closeness', 'betweenness', 'eigenvector'] and parallel:
+    if name in ['degree', 'closeness', 'betweenness', 'eigenvector', 'pagerank'] and parallel:
         _LOG.warning(f"Classical metric '{name}' does not support parallel processing; setting parallel=False.")
         parallel = False
 
@@ -234,10 +235,9 @@ def _compute_metrics_for_graph(
         remove_keys = [key for key, params in zip(metrics, param_names) if "avg_shortest_path" in params] + ["ninl_layer0"]
         _LOG.warning("Graph at index %d is not connected; skipping avg_shortest_path and metrics based on it (%s)", time, remove_keys)
 
-    remove_keys += ["mcde"]
     static_results: Dict[str, Dict[Any, Optional[float]]] = {}
     for key, fn in funcs:
-        if key not in remove_keys:
+        if remove_keys and key not in remove_keys:
             common: Dict[str, Any] = {
                 "degree": degree,
                 "core_num": core_num,

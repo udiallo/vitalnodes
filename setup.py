@@ -21,6 +21,9 @@ setup(
     package_dir={"": "src"},
     install_requires=[
         "networkx>=2.5",
+        "pathos >=0.3.0",
+        "numpy>=1.19",
+        "scipy>=1.5",
     ],
     extras_require={
         "dev": [
