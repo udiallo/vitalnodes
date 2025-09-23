@@ -149,7 +149,7 @@ def gravity_centrality(
     """Classical gravity centrality (global variant)."""
 
     paths = paths or _compute_paths(G)
-    core_num = core_num or nx.core_number(G)
+    core_num = core_num or dict(nx.core_number(G))
     use_mp = parallel
 
     payload = [(n, paths, core_num, max_distance) for n in G.nodes()]
@@ -187,7 +187,7 @@ def improved_gravity_centrality(
     """IGC: replace second node’s mass with its degree."""
 
     paths = paths or _compute_paths(G)
-    core_num = core_num or nx.core_number(G)
+    core_num = core_num or dict(nx.core_number(G))
     degree = degree or dict(G.degree())
     use_mp = parallel
 
@@ -308,8 +308,8 @@ def mcgm(
     # Lazily compute prerequisites
     paths = paths or _compute_paths(G)
     degree = degree or dict(G.degree())
-    core_num = core_num or nx.core_number(G)
-    eigenvec = eigenvec or nx.eigenvector_centrality(G, max_iter=1000)
+    core_num = core_num or dict(nx.core_number(G))
+    eigenvec = eigenvec or dict(nx.eigenvector_centrality(G, max_iter=1000))
 
     if avg_shortest_path is None:
         avg_shortest_path = nx.average_shortest_path_length(G)

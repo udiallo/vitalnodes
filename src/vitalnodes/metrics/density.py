@@ -93,7 +93,7 @@ def clustered_local_degree(
 ) -> Dict[int, float]:
     """Local degree sum modulated by clustering coefficient."""
 
-    degree = degree or dict(G.degree())
+    degree = degree or dict(G.degree()) # type: ignore
     paths = paths or _all_pairs_paths(G)
     if clustering is None:
         clustering = nx.clustering(G)

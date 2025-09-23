@@ -80,7 +80,7 @@ def ls_influence(
     """Compute the Link-Strength (LS) influence score exactly as in Li & Shu (2019)."""
 
     degree   = degree or dict(G.degree())
-    core_num = core_num or nx.core_number(G)
+    core_num = core_num or dict(nx.core_number(G))
     use_mp   = parallel if parallel is not None else len(G) >= 500
 
     # 1) Build neighbour‐set for each node:

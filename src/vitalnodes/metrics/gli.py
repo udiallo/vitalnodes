@@ -96,7 +96,7 @@ def gli_new(
     """GLI-new combines neighbour degree, Jaccard similarity & k-core."""
 
     degree = degree or dict(G.degree())
-    core_num = core_num or nx.core_number(G)
+    core_num = core_num or dict(nx.core_number(G))
     use_mp = parallel if parallel is not None else len(G) >= 500
 
     # cache neighbour lists

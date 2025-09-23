@@ -174,7 +174,7 @@ def mcde(
         If *True*, returns the *weighted* variant (MCDWE).
     """
     degree = degree or dict(G.degree())
-    core_num = core_num or nx.core_number(G)
+    core_num = core_num or dict(nx.core_number(G))
 
     max_core = max(core_num.values())
     sorted_cores = sorted(set(core_num.values()))
