@@ -92,7 +92,7 @@ If G is a static graph (nx.Graph):
 If G is a temporal graph (List[nx.Graph]):
   
   - If `metric == "tgc"`:
-    - `compute_metric(G, metric, *, parallel=None, processes=None, **kwargs) -> Dict[node, score]` 
+    - `compute_metric(G, metric, *, parallel=None, processes=None, mass_type="degree", aggregation="static", **kwargs) -> Dict[node, score]` 
   - otherwise:
     - `compute_metric(G, metric, *, parallel=None, processes=None, **kwargs) -> List[Dict[node, score]]` 
 
