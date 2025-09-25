@@ -37,6 +37,7 @@ Traditional centrality measures (degree, betweenness, closeness) quantify **stat
 - **Density-Based**: Density Centrality, CLD  
 - **Global-Local Influence**: GLI, GLI-new  
 - **Link-Strength**: LS  
+- **Classical centrality**: closeness, betweenness, eigenvector, pagerank
 - **Parallel execution** for large graphs  
 - **Uniform façade** via `vitalnodes.orchestrator`  
 - **Simple CLI** for on-the-fly metric computation  
