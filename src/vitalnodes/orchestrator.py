@@ -89,7 +89,10 @@ def _compute_metric_helper(fn, graph, time, kwargs):
     if not nx.is_connected(graph) and "avg_shortest_path" in inspect.signature(fn).parameters:
         _LOG.warning(f"Graph at index {time} is not connected; skipping avg_shortest_path and metric based on it (%s)", fn.__name__)
         return {n: None for n in graph.nodes()}
-    return fn(graph, **kwargs)
+    if "time_step" in inspect.signature(fn).parameters:
+        return fn(graph, time_step=time, **kwargs)
+    else:
+        return fn(graph, **kwargs)
 
 def compute_metric(
     G: Union[nx.Graph, List[nx.Graph]],
@@ -127,7 +130,10 @@ def compute_metric(
             if G[0].number_of_nodes() >= 500 or len(G) > 100:
                 _LOG.info("You maybe want to enable parallel processing for graphs with ≥ 500 nodes or more than 100 graphs unless you set ``parallel=False``.")
             if name != 'tgc':
-                return [fn(g, parallel=parallel, processes=processes, **kwargs) for g in G]
+                if "time_step" in inspect.signature(fn).parameters:
+                    return [fn(g, parallel=parallel, processes=processes,time_step=time, **kwargs) for time, g in enumerate(G)]
+                else:
+                    return [fn(g, parallel=parallel, processes=processes, **kwargs) for g in G]
             else:
                 _LOG.info("Temporal Gravity Centrality (tgc) is much slower than other metrics")
                 return fn(G, **kwargs)

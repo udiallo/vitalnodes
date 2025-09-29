@@ -12,7 +12,7 @@ _LOG = logging.getLogger(__name__)
 
 
 import networkx as nx
-from typing import Dict, Any, Optional
+from typing import Dict, Any, Optional, Union
 
 
 def get_degree(graph: nx.Graph, parallel: Optional[bool] = None, processes: Optional[int] = None, normalized: bool = False) -> Dict[Any, float]:
@@ -63,7 +63,7 @@ def get_betweenness(graph: nx.Graph, parallel: Optional[bool] = None, processes:
     """
     return dict(nx.betweenness_centrality(graph, normalized=normalized))
 
-def get_eigenvector(graph: nx.Graph, parallel: Optional[bool] = None, processes: Optional[int] = None, max_iter: int = 1000, tol: float = 1e-06) -> Dict[Any, float]:
+def get_eigenvector(graph: nx.Graph, parallel: Optional[bool] = None, processes: Optional[int] = None, max_iter: int = 1000, tol: float = 1e-06, time_step: Optional[float] = None) -> Dict[Any, Union[float, None]]:
     """Compute the eigenvector centrality for each node in the graph.
 
     Args:
@@ -76,9 +76,16 @@ def get_eigenvector(graph: nx.Graph, parallel: Optional[bool] = None, processes:
     Returns:
         Dict[Any, float]: A dictionary mapping each node to its eigenvector centrality.
     """
-    return dict(nx.eigenvector_centrality(graph, max_iter=max_iter, tol=tol))
+    try:
+        return dict(nx.eigenvector_centrality(graph, max_iter=max_iter, tol=tol))
+    except nx.PowerIterationFailedConvergence as e:
+        if time_step is not None:
+            _LOG.warning(f"Eigenvector centrality did not converge at time step {time_step} within the specified number of iterations.")
+        else:
+            _LOG.warning("Eigenvector centrality did not converge within the specified number of iterations.")
+        return {n: None for n in graph.nodes()} 
 
-def get_pagerank(graph: nx.Graph, parallel: Optional[bool] = None, processes: Optional[int] = None, alpha: float = 0.85, max_iter: int = 100, tol: float = 1e-06) -> Dict[Any, float]:
+def get_pagerank(graph: nx.Graph, parallel: Optional[bool] = None, processes: Optional[int] = None, alpha: float = 0.85, max_iter: int = 100, tol: float = 1e-06, time_step: Optional[float] = None) -> Dict[Any, Union[float, None]]:
     """Compute the PageRank for each node in the graph.
 
     Args:
@@ -92,4 +99,11 @@ def get_pagerank(graph: nx.Graph, parallel: Optional[bool] = None, processes: Op
     Returns:
         Dict[Any, float]: A dictionary mapping each node to its PageRank value.
     """
-    return dict(nx.pagerank(graph, alpha=alpha, max_iter=max_iter, tol=tol))
+    try:
+        return dict(nx.pagerank(graph, alpha=alpha, max_iter=max_iter, tol=tol))
+    except nx.PowerIterationFailedConvergence as e:
+        if time_step is not None:
+            _LOG.warning(f"PageRank did not converge at time step {time_step} within the specified number of iterations.")
+        else:
+            _LOG.warning("PageRank did not converge within the specified number of iterations.")
+        return {n: None for n in graph.nodes()}
